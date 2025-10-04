@@ -43,6 +43,8 @@ import "@univerjs/sheets-drawing-ui/lib/index.css";
 import * as XLSX from "xlsx";
 import { useWorkbook } from "../../hooks/useWorkbook";
 import { AUTO_SAVE_INTERVAL } from "../../utils/constants";
+import { SaveAsTemplateModal } from "../Template/SaveAsTemplateModal";
+import { LoadDataModal } from "../Data/LoadDataModal";
 
 interface UniverSheetProps {
   workbookId?: string;
@@ -65,6 +67,8 @@ export const UniverSheet: React.FC<UniverSheetProps> = ({
   const [isChartModalOpen, setIsChartModalOpen] = useState(false);
   const [showChartList, setShowChartList] = useState(false);
   const [editingChart, setEditingChart] = useState<ChartConfig | undefined>();
+  const [showSaveTemplateModal, setShowSaveTemplateModal] = useState(false);
+  const [showLoadDataModal, setShowLoadDataModal] = useState(false);
 
   // ✅ Track current unit ID with ref instead of global variable
   const currentWorkbookUnitIdRef = useRef<string | null>(null);
@@ -241,11 +245,11 @@ export const UniverSheet: React.FC<UniverSheetProps> = ({
       clearInterval(autoSaveTimerRef.current);
     }
 
-    autoSaveTimerRef.current = setInterval(() => {
-      if (workbookId) {
-        handleAutoSave();
-      }
-    }, AUTO_SAVE_INTERVAL);
+    // autoSaveTimerRef.current = setInterval(() => {
+    //   if (workbookId) {
+    //     handleAutoSave();
+    //   }
+    // }, AUTO_SAVE_INTERVAL);
   };
 
   const handleAutoSave = async () => {
@@ -402,6 +406,15 @@ export const UniverSheet: React.FC<UniverSheetProps> = ({
     XLSX.writeFile(wb, `${workbookName}.xlsx`);
   };
 
+  const handleSaveAsTemplate = () => {
+    const snapshot = getCurrentSnapshot();
+    if (!snapshot) {
+      alert("No data to save as template");
+      return;
+    }
+    setShowSaveTemplateModal(true);
+  };
+
   return (
     <div
       style={{
@@ -419,6 +432,7 @@ export const UniverSheet: React.FC<UniverSheetProps> = ({
           display: "flex",
           alignItems: "center",
           gap: "12px",
+          flexWrap: "wrap",
         }}
       >
         {onBack && (
@@ -453,6 +467,7 @@ export const UniverSheet: React.FC<UniverSheetProps> = ({
           }}
         />
 
+        {/* Primary Actions */}
         <button
           onClick={handleSave}
           disabled={isSaving}
@@ -470,6 +485,24 @@ export const UniverSheet: React.FC<UniverSheetProps> = ({
           {isSaving ? "Saving..." : "Save"}
         </button>
 
+        {/* Template Actions */}
+        <button
+          onClick={handleSaveAsTemplate}
+          style={{
+            padding: "8px 16px",
+            backgroundColor: "#9c27b0",
+            color: "#fff",
+            border: "none",
+            borderRadius: "4px",
+            cursor: "pointer",
+            fontSize: "14px",
+            fontWeight: "500",
+          }}
+        >
+          💾 Save as Template
+        </button>
+
+        {/* File Actions */}
         <label
           style={{
             padding: "8px 16px",
@@ -507,6 +540,23 @@ export const UniverSheet: React.FC<UniverSheetProps> = ({
         </button>
 
         <button
+          onClick={() => setShowLoadDataModal(true)}
+          style={{
+            padding: "8px 16px",
+            backgroundColor: "#ff9800",
+            color: "#fff",
+            border: "none",
+            borderRadius: "4px",
+            cursor: "pointer",
+            fontSize: "14px",
+            fontWeight: "500",
+          }}
+        >
+          Load Data
+        </button>
+
+        {/* Chart Actions */}
+        <button
           onClick={() => setIsChartModalOpen(true)}
           style={{
             padding: "8px 16px",
@@ -543,43 +593,99 @@ export const UniverSheet: React.FC<UniverSheetProps> = ({
             Last saved: {lastSaved.toLocaleTimeString()}
           </span>
         )}
+      </div>
 
-        <ChartModal
-          isOpen={isChartModalOpen}
+      {showSaveTemplateModal && (
+        <SaveAsTemplateModal
           snapshot={getCurrentSnapshot()}
-          existingChart={editingChart}
-          onSave={(chart) => {
-            if (editingChart) {
-              // Update existing
-              setCharts(charts.map((c) => (c.id === chart.id ? chart : c)));
-            } else {
-              // Add new
-              setCharts([...charts, chart]);
-            }
-            setEditingChart(undefined);
-          }}
-          onClose={() => {
-            setIsChartModalOpen(false);
-            setEditingChart(undefined);
+          onClose={() => setShowSaveTemplateModal(false)}
+          onSuccess={() => {
+            setShowSaveTemplateModal(false);
+            alert("Template created successfully!");
           }}
         />
+      )}
 
-        {showChartList && (
-          <ChartList
-            charts={charts}
-            snapshot={getCurrentSnapshot()}
-            onEdit={(chart) => {
-              setEditingChart(chart);
-              setIsChartModalOpen(true);
-              setShowChartList(false);
-            }}
-            onDelete={(chartId) => {
-              setCharts(charts.filter((c) => c.id !== chartId));
-            }}
-            onClose={() => setShowChartList(false)}
-          />
-        )}
-      </div>
+      {showLoadDataModal && (
+        <LoadDataModal
+          currentSnapshot={getCurrentSnapshot()}
+          onClose={() => setShowLoadDataModal(false)}
+          onDataLoaded={(newSnapshot) => {
+            const sheet = newSnapshot.sheets["sheet-1"];
+
+            // ✅ Dùng reduce thay vì Math.max(...array)
+            const rowIndices = Object.keys(sheet.cellData).map(Number);
+            const maxRow = rowIndices.reduce(
+              (max, val) => Math.max(max, val),
+              0
+            );
+
+            // Tính max column
+            const allCols: number[] = [];
+            Object.values(sheet.cellData).forEach((row: any) => {
+              const cols = Object.keys(row).map(Number);
+              cols.forEach((c) => allCols.push(c));
+            });
+            const maxCol =
+              allCols.length > 0
+                ? allCols.reduce((max, val) => Math.max(max, val), 0)
+                : 0;
+
+            // Set config
+            if (!sheet.rowCount || sheet.rowCount < maxRow) {
+              sheet.rowCount = maxRow + 100;
+            }
+            if (!sheet.columnCount || sheet.columnCount < maxCol) {
+              sheet.columnCount = maxCol + 10;
+            }
+
+            console.log(
+              `📊 Setting sheet config: rowCount=${sheet.rowCount}, columnCount=${sheet.columnCount}`
+            );
+
+            // Dispose current unit
+            if (currentWorkbookUnitIdRef.current && univer) {
+              const univerInstanceService = univer
+                .__getInjector()
+                .get(IUniverInstanceService);
+              try {
+                univerInstanceService.disposeUnit(
+                  currentWorkbookUnitIdRef.current
+                );
+              } catch (e) {
+                console.warn("Error disposing:", e);
+              }
+            }
+
+            const newUnitId = `workbook-loaded-${Date.now()}`;
+            currentWorkbookUnitIdRef.current = newUnitId;
+
+            univer!.createUnit(UniverInstanceType.UNIVER_SHEET, {
+              ...newSnapshot,
+              id: newUnitId,
+            });
+
+            setTimeout(() => {
+              const univerInstanceService = univer!
+                .__getInjector()
+                .get(IUniverInstanceService);
+              const unit = univerInstanceService.getUnit(newUnitId);
+              const saved = unit?.save();
+              if (saved) {
+                const actualRows = Object.keys(
+                  saved.sheets["sheet-1"].cellData
+                ).length;
+                console.log(
+                  `✅ Verification: ${actualRows} rows loaded (expected ${rowIndices.length})`
+                );
+              }
+            }, 500);
+
+            setShowLoadDataModal(false);
+            alert(`Data loaded! ${rowIndices.length} rows`);
+          }}
+        />
+      )}
 
       <div id="app" style={{ flex: 1, overflow: "hidden" }} />
     </div>

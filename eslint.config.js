@@ -23,6 +23,7 @@ export default defineConfig([
       "@typescript-eslint/no-unused-vars": "warn", // 👈 chuyển thành cảnh báo
       "@typescript-eslint/no-explicit-any": "off",
       "react/style-prop-object": "off",
+      "react/no-inline-styles": "off",
     },
   },
 ]);

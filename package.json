@@ -21,6 +21,8 @@
     "@univerjs/drawing-ui": "^0.10.10",
     "@univerjs/engine-formula": "^0.10.10",
     "@univerjs/engine-render": "^0.10.10",
+    "@univerjs/preset-sheets-core": "^0.10.10",
+    "@univerjs/presets": "^0.10.10",
     "@univerjs/sheets": "^0.10.10",
     "@univerjs/sheets-drawing": "^0.10.10",
     "@univerjs/sheets-drawing-ui": "^0.10.10",
